@@ -39,7 +39,7 @@ public class BuilderInWorldShould
     public void InitializePartsCorrectly()
     {
         //Act
-        builderInWorld.Enable();
+        builderInWorld.Initialize();
 
         //Assert
         builderInWorld.editor.Received(1).Initialize(builderInWorld.context);
