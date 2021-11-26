@@ -2061,7 +2061,7 @@ namespace UnityGLTF
             if (AreMeshTrianglesValid(unityMeshData.Triangles, vertexCount)) // Some scenes contain broken meshes that can trigger a fatal error
             {
                 mesh.triangles = unityMeshData.Triangles;
-                yield return SkipFrameIfDepletedTimeBudget.cachedInstance;
+                yield return skipFrameIfDepletedTimeBudget;
             }
             else
             {
@@ -2093,7 +2093,7 @@ namespace UnityGLTF
         private bool AreMeshTrianglesValid(int[] triangles, int vertexCount)
         {
             bool areValid = true;
-            
+
             for (var i = 0; i < triangles.Length; i++)
             {
                 if (triangles[i] > vertexCount)
@@ -2349,7 +2349,7 @@ namespace UnityGLTF
             else
             {
                 yield return ConstructImage(settings, image, sourceId);
-                
+
                 if (_assetCache.ImageCache[sourceId] == null)
                 {
                     Debug.Log($"GLTFSceneImporter - ConstructTexture - null tex detected for {sourceId} / {image.Uri} / {id}, applying invalid-tex texture...");
