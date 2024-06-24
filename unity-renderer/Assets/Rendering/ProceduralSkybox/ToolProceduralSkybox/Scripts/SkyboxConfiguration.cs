@@ -19,14 +19,22 @@ namespace DCL.Skybox
         public Gradient skyColor = new Gradient();
         public Gradient horizonColor = new Gradient();
         public Gradient groundColor = new Gradient();
-
-        // Horizon Layer
         public List<TransitioningFloat> horizonWidth = new List<TransitioningFloat>();
         public List<TransitioningFloat> horizonHeight = new List<TransitioningFloat>();
+
+        // Horizon Layer
         public Texture2D horizonMask;
-        public Vector3 horizonMaskValues = new Vector3(0, 0, 0);
+        public Vector2 horizonMaskTiling = new Vector2(0, 0);
+        public Vector2 horizonMaskOffset = new Vector2(0, 0);
+
+        // Horizon Plane Layer
+        public Texture2D horizonPlaneTexture;
+        public Vector2 horizonPlaneTiling = new Vector2(0, 0);
+        public Vector2 horizonPlaneOffset = new Vector2(0, 0);
         public Gradient horizonPlaneColor = new Gradient();
         public List<TransitioningFloat> horizonPlaneHeight = new List<TransitioningFloat>();
+        public Vector2 horizonPlaneSmoothRange = new Vector2(0, 0);
+        public float horizonLightIntensity = 0;
 
         // Ambient Color
         public bool ambientTrilight = true;
@@ -55,6 +63,7 @@ namespace DCL.Skybox
         public float fogDensity = 0.05f;
         public float fogStartDistance = 0;
         public float fogEndDistance = 300;
+        public float fogIntensityOnLayer = 0.0f;
 
         // DirectionalLight Properties
         public bool useDirectionalLight = true;
@@ -85,9 +94,13 @@ namespace DCL.Skybox
             selectedMat.SetFloat(SkyboxShaderUtils.HorizonHeight, GetTransitionValue(horizonHeight, percentage, 0f));
             selectedMat.SetFloat(SkyboxShaderUtils.HorizonWidth, GetTransitionValue(horizonWidth, percentage, 0f));
             selectedMat.SetTexture(SkyboxShaderUtils.HorizonMask, horizonMask);
-            selectedMat.SetVector(SkyboxShaderUtils.HorizonMaskValues, horizonMaskValues);
+            selectedMat.SetVector(SkyboxShaderUtils.HorizonMaskValues, new Vector4(horizonMaskTiling.x, horizonMaskTiling.y, horizonMaskOffset.x, horizonMaskOffset.y));
+            selectedMat.SetTexture(SkyboxShaderUtils.HorizonPlane, horizonPlaneTexture);
+            selectedMat.SetVector(SkyboxShaderUtils.HorizonPlaneValues, new Vector4(horizonPlaneTiling.x, horizonPlaneTiling.y, horizonPlaneOffset.x, horizonPlaneOffset.y));
             selectedMat.SetColor(SkyboxShaderUtils.HorizonPlaneColor, horizonPlaneColor.Evaluate(normalizedDayTime));
-            selectedMat.SetFloat(SkyboxShaderUtils.HorizonPlaneHeight, GetTransitionValue(horizonPlaneHeight, percentage, -1f));
+            selectedMat.SetFloat(SkyboxShaderUtils.HorizonPlaneHeight, GetTransitionValue(horizonPlaneHeight, percentage, 0.0f));
+            selectedMat.SetVector(SkyboxShaderUtils.PlaneSmoothRange, horizonPlaneSmoothRange);
+            selectedMat.SetFloat(SkyboxShaderUtils.HorizonLightIntensity, horizonLightIntensity);
 
 
             // Apply Ambient colors to the rendering settings
@@ -119,6 +132,12 @@ namespace DCL.Skybox
                         RenderSettings.fogDensity = fogDensity;
                         break;
                 }
+
+                selectedMat.SetFloat(SkyboxShaderUtils.FogIntensity, fogIntensityOnLayer);
+            }
+            else
+            {
+                selectedMat.SetFloat(SkyboxShaderUtils.FogIntensity, 0);
             }
 
             //Directional List
@@ -503,10 +522,7 @@ namespace DCL.Skybox
                 selectedMat.SetFloat(SkyboxShaderUtils.GetLayerProperty("_RenderDistance_" + layerNum), 0);
                 selectedMat.SetTexture(SkyboxShaderUtils.GetLayerProperty("_tex_" + layerNum), null);
                 selectedMat.SetTexture(SkyboxShaderUtils.GetLayerProperty("_cubemap_" + layerNum), layer.cubemap);
-                selectedMat.SetTexture(SkyboxShaderUtils.GetLayerProperty("_normals_" + layerNum), null);
-                selectedMat.SetVector(SkyboxShaderUtils.GetLayerProperty("_timeFrame_" + layerNum), new Vector4(layer.timeSpan_start, layer.timeSpan_End));
                 selectedMat.SetFloat(SkyboxShaderUtils.GetLayerProperty("_lightIntensity_" + layerNum), layer.tintPercentage / 100);
-                selectedMat.SetFloat(SkyboxShaderUtils.GetLayerProperty("_normalIntensity_" + layerNum), 0);
                 selectedMat.SetVector(SkyboxShaderUtils.GetLayerProperty("_distortIntAndSize_" + layerNum), Vector2.zero);
                 selectedMat.SetVector(SkyboxShaderUtils.GetLayerProperty("_distortSpeedAndSharp_" + layerNum), Vector4.zero);
                 // Particles
@@ -537,7 +553,6 @@ namespace DCL.Skybox
         {
             selectedMat.SetFloat(SkyboxShaderUtils.GetLayerProperty("_RenderDistance_" + layerNum), GetTransitionValue(layer.renderDistance, normalizedLayerTime * 100, 3.4f));
             selectedMat.SetTexture(SkyboxShaderUtils.GetLayerProperty("_tex_" + layerNum), layer.texture);
-            selectedMat.SetTexture(SkyboxShaderUtils.GetLayerProperty("_normals_" + layerNum), layer.textureNormal);
             selectedMat.SetTexture(SkyboxShaderUtils.GetLayerProperty("_cubemap_" + layerNum), null);
 
             selectedMat.SetColor(SkyboxShaderUtils.GetLayerProperty("_color_" + layerNum), layer.color.Evaluate(normalizedLayerTime));
@@ -576,10 +591,6 @@ namespace DCL.Skybox
             }
 
 
-            // Time frame
-            selectedMat.SetVector(SkyboxShaderUtils.GetLayerProperty("_timeFrame_" + layerNum), new Vector4(layer.timeSpan_start, layer.timeSpan_End));
-            // normal intensity
-            selectedMat.SetFloat(SkyboxShaderUtils.GetLayerProperty("_normalIntensity_" + layerNum), layer.normalIntensity);
             // Tint
             selectedMat.SetFloat(SkyboxShaderUtils.GetLayerProperty("_lightIntensity_" + layerNum), layer.tintPercentage / 100);
 
@@ -600,7 +611,6 @@ namespace DCL.Skybox
         void ApplySatelliteTextureLayer(Material selectedMat, float dayTime, float normalizedLayerTime, int layerNum, TextureLayer layer, bool changeAlllValues = true)
         {
             selectedMat.SetTexture(SkyboxShaderUtils.GetLayerProperty("_tex_" + layerNum), layer.texture);
-            selectedMat.SetTexture(SkyboxShaderUtils.GetLayerProperty("_normals_" + layerNum), layer.textureNormal);
             selectedMat.SetTexture(SkyboxShaderUtils.GetLayerProperty("_cubemap_" + layerNum), null);
 
             selectedMat.SetColor(SkyboxShaderUtils.GetLayerProperty("_color_" + layerNum), layer.color.Evaluate(normalizedLayerTime));
@@ -630,10 +640,6 @@ namespace DCL.Skybox
                 selectedMat.SetVector(SkyboxShaderUtils.GetLayerProperty("_speedAndRotation_" + layerNum), new Vector4(0, 0, rot));
             }
 
-            // Time frame
-            selectedMat.SetVector(SkyboxShaderUtils.GetLayerProperty("_timeFrame_" + layerNum), new Vector4(layer.timeSpan_start, layer.timeSpan_End));
-            // normal intensity
-            selectedMat.SetFloat(SkyboxShaderUtils.GetLayerProperty("_normalIntensity_" + layerNum), layer.normalIntensity);
             // Tint
             selectedMat.SetFloat(SkyboxShaderUtils.GetLayerProperty("_lightIntensity_" + layerNum), layer.tintPercentage / 100);
 
@@ -657,15 +663,11 @@ namespace DCL.Skybox
             selectedMat.SetVector(SkyboxShaderUtils.GetLayerProperty("_distortSpeedAndSharp_" + layerNum), Vector4.zero);
 
 
-            // Time frame
-            selectedMat.SetVector(SkyboxShaderUtils.GetLayerProperty("_timeFrame_" + layerNum), new Vector4(layer.timeSpan_start, layer.timeSpan_End));
             // Tint
             selectedMat.SetFloat(SkyboxShaderUtils.GetLayerProperty("_lightIntensity_" + layerNum), layer.tintPercentage / 100);
 
             // Particles
             selectedMat.SetTexture(SkyboxShaderUtils.GetLayerProperty("_tex_" + layerNum), layer.texture);
-            selectedMat.SetTexture(SkyboxShaderUtils.GetLayerProperty("_normals_" + layerNum), layer.textureNormal);
-            selectedMat.SetFloat(SkyboxShaderUtils.GetLayerProperty("_normalIntensity_" + layerNum), layer.normalIntensity);
             selectedMat.SetVector(SkyboxShaderUtils.GetLayerProperty("_rowAndCollumns_" + layerNum), layer.flipbookRowsAndColumns);
             selectedMat.SetColor(SkyboxShaderUtils.GetLayerProperty("_color_" + layerNum), layer.color.Evaluate(normalizedLayerTime));
             selectedMat.SetVector(SkyboxShaderUtils.GetLayerProperty("_tilingAndOffset_" + layerNum), new Vector4(layer.particleTiling.x, layer.particleTiling.y, layer.particlesOffset.x, layer.particlesOffset.y));
@@ -806,13 +808,10 @@ namespace DCL.Skybox
             selectedMat.SetFloat(SkyboxShaderUtils.GetLayerProperty("_layerType_" + slotCount), 0);
             selectedMat.SetTexture(SkyboxShaderUtils.GetLayerProperty("_tex_" + slotCount), null);
             selectedMat.SetTexture(SkyboxShaderUtils.GetLayerProperty("_cubemap_" + slotCount), null);
-            selectedMat.SetTexture(SkyboxShaderUtils.GetLayerProperty("_normals_" + slotCount), null);
             selectedMat.SetColor(SkyboxShaderUtils.GetLayerProperty("_color_" + slotCount), new Color(1, 1, 1, 0));
             selectedMat.SetVector(SkyboxShaderUtils.GetLayerProperty("_tilingAndOffset_" + slotCount), new Vector4(1, 1, 0, 0));
             selectedMat.SetVector(SkyboxShaderUtils.GetLayerProperty("_speedAndRotation_" + slotCount), new Vector4(0, 0, 0));
-            selectedMat.SetVector(SkyboxShaderUtils.GetLayerProperty("_timeFrame_" + slotCount), new Vector4(0, 0));
             selectedMat.SetFloat(SkyboxShaderUtils.GetLayerProperty("_fadeTime_" + slotCount), 1);
-            selectedMat.SetFloat(SkyboxShaderUtils.GetLayerProperty("_normalIntensity_" + slotCount), 0);
             selectedMat.SetFloat(SkyboxShaderUtils.GetLayerProperty("_lightIntensity_" + slotCount), 0);
             selectedMat.SetFloat(SkyboxShaderUtils.GetLayerProperty("_RenderDistance_" + slotCount), 3.4f);
             selectedMat.SetVector(SkyboxShaderUtils.GetLayerProperty("_distortIntAndSize_" + slotCount), new Vector2(0, 0));
